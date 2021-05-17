@@ -93,12 +93,12 @@ def test_pickle():
         # print(ratings_list)
         # print(type(ratings_list))
         # print(len(history_v_lists))
-        # print(len(history_u_lists))
-        print(test_r)
-        dic = {0.5:0, 1.0:0, 1.5:0, 2.0:0, 2.5:0, 3.0:0, 3.5:0, 4.0:0}
-        for i in train_r:
-            dic[i] = dic[i]+1
-        print(dic)
+        print((history_u_lists))
+        # print(test_r)
+        # dic = {0.5:0, 1.0:0, 1.5:0, 2.0:0, 2.5:0, 3.0:0, 3.5:0, 4.0:0}
+        # for i in train_r:
+        #     dic[i] = dic[i]+1
+        # print(dic)
 
 
 def create_pickle():
@@ -146,10 +146,35 @@ def create_pickle():
             star = row[5]
             if user_id == 'user_id':
                 continue
-            history_u_lists[user_id] = business_id
-            history_ur_lists[user_id] = star
-            history_v_lists[business_id] = user_id
-            history_vr_lists[business_id] = star
+            if history_u_lists.__contains__(user_id):
+                temp = history_u_lists[user_id]
+                temp.append(business_id)
+                history_u_lists[user_id] = temp
+
+                temp = history_ur_lists[user_id]
+                temp.append(star)
+                history_ur_lists[user_id] = temp
+            else:
+                history_u_lists[user_id] = [business_id]
+                history_ur_lists[user_id] = [star]
+
+            if history_v_lists.__contains__(business_id):
+                temp = history_v_lists[business_id]
+                temp.append(user_id)
+                history_v_lists[business_id] = temp
+                print(temp)
+
+                temp = history_vr_lists[business_id]
+                temp.append(star)
+                history_vr_lists[business_id] = temp
+            else:
+                history_v_lists[user_id] = [business_id]
+                history_vr_lists[user_id] = [star]
+
+            # history_u_lists[user_id] = business_id
+            # history_ur_lists[user_id] = star
+            # history_v_lists[business_id] = user_id
+            # history_vr_lists[business_id] = star
             train_u.append(user_id)
             train_v.append(business_id)
             train_r.append(star)
@@ -183,8 +208,10 @@ if __name__ == '__main__':
     # print(t2-t1)
     # print(t3-t2)
     # test_pickle()
-    create_pickle()
-    # with open('social_list.pickle', 'r') as f:
-    #     reader = csv.reader(f)
-    #     for row in reader:
-    #         print(row)
+    # create_pickle()
+    with open('history_v.pickle', 'rb') as f:
+        reader = pickle.load(f)
+        print(reader[1]["FKLLFGtNHaNScNfc-A_nRA"])
+
+
+
