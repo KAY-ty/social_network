@@ -136,7 +136,7 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
 
     embed_dim = args.embed_dim
-    dir_data = './data/toy_dataset'
+    dir_data = args.data
 
     path_data = dir_data + ".pickle"
     data_file = open(path_data, 'rb')
