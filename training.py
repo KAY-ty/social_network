@@ -121,6 +121,7 @@ def test(model, device, test_loader):
 def main():
     # Training settings
     parser = argparse.ArgumentParser(description='Social Recommendation: GraphRec model')
+    parser.add_argument('--data',help='path to dataset',required=True)
     parser.add_argument('--batch_size', type=int, default=128, metavar='N', help='input batch size for training')
     parser.add_argument('--embed_dim', type=int, default=64, metavar='N', help='embedding size')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
