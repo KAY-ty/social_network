@@ -3,6 +3,7 @@ import json
 import os
 import csv
 import time
+import pandas as pd
 import pickle
 
 def preprocess():
@@ -193,19 +194,28 @@ def create_pickle():
     #         print(row)
 
 def create_pickle_include_test():
-    csv.field_size_limit(500 * 1024 * 1024)
-    with open('yelp_academic_dataset_user.csv', 'r') as f:
-        social_adj_lists = {}
-        reader = csv.reader(f)
-        i = 0
-        for row in reader:
-            print("user"+str(i))
-            i = i+1
-            friends = row[7]
-            id = row[14]
-            if id == 'user_id':
-                continue
-            social_adj_lists[id] = friends
+    df = pd.read_csv('yelp_academic_dataset_user.csv', usecols=[7, 14])
+    social_adj_lists = {}
+    i = 0
+    for row in df.iterrows():
+        id = row[1]['user_id']
+        friends = row[1]['friends']
+        print("user"+str(i))
+        i = i+1
+        social_adj_lists[id] = friends.split(', ')
+    # csv.field_size_limit(500 * 1024 * 1024)
+    # with open('yelp_academic_dataset_user.csv', 'r') as f:
+    #     social_adj_lists = {}
+    #     reader = csv.reader(f)
+    #     i = 0
+    #     for row in reader:
+    #         print("user"+str(i))
+    #         i = i+1
+    #         friends = row[7]
+    #         id = row[14]
+    #         if id == 'user_id':
+    #             continue
+    #         social_adj_lists[id] = friends
 
     bytes_out = pickle.dumps(social_adj_lists)
     n_bytes = 2 ** 31
@@ -286,6 +296,7 @@ def create_pickle_include_test():
         pickle.dump(a, f)
 
 
+
 if __name__ == '__main__':
     # t1 = time.clock()
     # user_graph, user_dict = create_user_graph()
@@ -295,7 +306,7 @@ if __name__ == '__main__':
     # print(t2-t1)
     # print(t3-t2)
     # test_pickle()
-    # create_pickle_include_test()
+    create_pickle_include_test()
     with open('social_list.pickle', 'rb') as f:
         social_list = pickle.load(f)
 
@@ -328,6 +339,15 @@ if __name__ == '__main__':
     print(cnt)
     print(len(train_u))
     print(len(test_u))
+    for key in social_list.keys():
+        print(type(social_list[key]))
+
+
+        break
+
+    for key in history_u_lists.keys():
+        print(type(history_u_lists[key]))
+        break
 
 
 
