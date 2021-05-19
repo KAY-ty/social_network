@@ -1,24 +1,20 @@
-import torch
-import torch.nn as nn
-from torch.nn import init
-from torch.autograd import Variable
-import pickle
-import numpy as np
-import time
-import random
-from collections import defaultdict
-from UV_Encoders import UV_Encoder
-from UV_Aggregators import UV_Aggregator
-from Social_Encoders import Social_Encoder
-from Social_Aggregators import Social_Aggregator
-import torch.nn.functional as F
-import torch.utils.data
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import mean_absolute_error
-from math import sqrt
-import datetime
 import argparse
 import os
+import pickle
+from math import sqrt
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.utils.data
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+
+from Social_Aggregators import Social_Aggregator
+from Social_Encoders import Social_Encoder
+from UV_Aggregators import UV_Aggregator
+from UV_Encoders import UV_Encoder
 
 """
 GraphRec: Graph Neural Networks for Social Recommendation. 
@@ -40,17 +36,25 @@ If you use this code, please cite our paper:
 
 class GraphRec(nn.Module):
 
-    def __init__(self, enc_u, enc_v_history, r2e):
+    def __init__(self, enc_u, enc_v_history, r2e, uf2e, vf2e):
         super(GraphRec, self).__init__()
         self.enc_u = enc_u
         self.enc_v_history = enc_v_history
         self.embed_dim = enc_u.embed_dim
+        self.uf2e = uf2e
+        self.vf2e = vf2e
+        dim_uf = uf2e.weight.shape[1]
+        dim_vf = vf2e.weight.shape[1]
 
+        self.w_uf = nn.Linear(dim_uf, self.embed_dim)
+        self.w_vf = nn.Linear(dim_vf, self.embed_dim)
+        self.bn_uf = nn.BatchNorm1d(self.embed_dim, momentum=0.5)
+        self.bn_vf = nn.BatchNorm1d(self.embed_dim, momentum=0.5)
         self.w_ur1 = nn.Linear(self.embed_dim, self.embed_dim)
         self.w_ur2 = nn.Linear(self.embed_dim, self.embed_dim)
         self.w_vr1 = nn.Linear(self.embed_dim, self.embed_dim)
         self.w_vr2 = nn.Linear(self.embed_dim, self.embed_dim)
-        self.w_uv1 = nn.Linear(self.embed_dim * 2, self.embed_dim)
+        self.w_uv1 = nn.Linear(self.embed_dim * 4, self.embed_dim)
         self.w_uv2 = nn.Linear(self.embed_dim, 16)
         self.w_uv3 = nn.Linear(16, 1)
         self.r2e = r2e
@@ -63,6 +67,11 @@ class GraphRec(nn.Module):
     def forward(self, nodes_u, nodes_v):
         embeds_u = self.enc_u(nodes_u)
         embeds_v = self.enc_v_history(nodes_v)
+        embeds_uf = self.uf2e(nodes_u)
+        embeds_vf = self.vf2e(nodes_v)
+
+        x_uf = F.relu(self.bn_uf(self.w_uf(embeds_uf)))
+        x_vf = F.relu(self.bn_vf(self.w_vf(embeds_vf)))
 
         x_u = F.relu(self.bn1(self.w_ur1(embeds_u)))
         x_u = F.dropout(x_u, training=self.training)
@@ -71,7 +80,7 @@ class GraphRec(nn.Module):
         x_v = F.dropout(x_v, training=self.training)
         x_v = self.w_vr2(x_v)
 
-        x_uv = torch.cat((x_u, x_v), 1)
+        x_uv = torch.cat((x_u, x_v, x_uf, x_vf), 1)
         x = F.relu(self.bn3(self.w_uv1(x_uv)))
         x = F.dropout(x, training=self.training)
         x = F.relu(self.bn4(self.w_uv2(x)))
@@ -101,7 +110,7 @@ def train(model, device, train_loader, optimizer, epoch, best_rmse, best_mae):
     return 0
 
 
-def test(model, device, test_loader):
+def model_test(model, device, test_loader):
     model.eval()
     tmp_pred = []
     target = []
@@ -121,9 +130,9 @@ def test(model, device, test_loader):
 def main():
     # Training settings
     parser = argparse.ArgumentParser(description='Social Recommendation: GraphRec model')
-    parser.add_argument('--data',help='path to dataset',required=True)
-    parser.add_argument('--batch_size', type=int, default=128, metavar='N', help='input batch size for training')
-    parser.add_argument('--embed_dim', type=int, default=64, metavar='N', help='embedding size')
+    # parser.add_argument('--data',help='path to dataset',required=True)
+    parser.add_argument('--batch_size', type=int, default=32, metavar='N', help='input batch size for training')
+    parser.add_argument('--embed_dim', type=int, default=32, metavar='N', help='embedding size')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--test_batch_size', type=int, default=1000, metavar='N', help='input batch size for testing')
     parser.add_argument('--epochs', type=int, default=100, metavar='N', help='number of epochs to train')
@@ -136,12 +145,27 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
 
     embed_dim = args.embed_dim
-    dir_data = args.data
+    # dir_data = args.data
+    #
+    # path_data = dir_data + ".pickle"
+    # data_file = open(path_data, 'rb')
+    # history_u_lists, history_ur_lists, history_v_lists, history_vr_lists, train_u, train_v, train_r, test_u, test_v, test_r, social_adj_lists, ratings_list = pickle.load(
+    print('load dataset')
+    with open('data/history_u.pickle', 'rb') as f:
+        history_u_lists, history_ur_lists = pickle.load(f)
 
-    path_data = dir_data + ".pickle"
-    data_file = open(path_data, 'rb')
-    history_u_lists, history_ur_lists, history_v_lists, history_vr_lists, train_u, train_v, train_r, test_u, test_v, test_r, social_adj_lists, ratings_list = pickle.load(
-        data_file)
+    with open('data/history_v.pickle', 'rb') as f:
+        history_v_lists, history_vr_lists = pickle.load(f)
+
+    with open('data/train.pickle', 'rb') as f:
+        train_u, train_v, train_r = pickle.load(f)
+
+    with open('data/test.pickle', 'rb') as f:
+        test_u, test_v, test_r = pickle.load(f)
+
+    with open('data/social_list.pickle', 'rb') as f:
+        social_adj_lists = pickle.load(f)[0]
+
     """
     ## toy dataset 
     history_u_lists, history_ur_lists:  user's purchased history (item set in training set), and his/her rating score (dict)
@@ -155,6 +179,10 @@ def main():
     social_adj_lists: user's connected neighborhoods
     ratings_list: rating value from 0.5 to 4.0 (8 opinion embeddings)
     """
+    # train_r=list(map(float,train_r))
+    # test_r=list(map(float,test_r))
+    user_feat = torch.load('data/user.pt').float()
+    item_feat = torch.load('data/business.pt').float()
 
     trainset = torch.utils.data.TensorDataset(torch.LongTensor(train_u), torch.LongTensor(train_v),
                                               torch.FloatTensor(train_r))
@@ -164,11 +192,14 @@ def main():
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=True)
     num_users = history_u_lists.__len__()
     num_items = history_v_lists.__len__()
-    num_ratings = ratings_list.__len__()
+    num_ratings = 6
 
+    print('construct model')
     u2e = nn.Embedding(num_users, embed_dim).to(device)
     v2e = nn.Embedding(num_items, embed_dim).to(device)
     r2e = nn.Embedding(num_ratings, embed_dim).to(device)
+    uf2e = nn.Embedding.from_pretrained(user_feat)
+    vf2e = nn.Embedding.from_pretrained(item_feat)
 
     # user feature
     # features: item * rating
@@ -184,17 +215,18 @@ def main():
     enc_v_history = UV_Encoder(v2e, embed_dim, history_v_lists, history_vr_lists, agg_v_history, cuda=device, uv=False)
 
     # model
-    graphrec = GraphRec(enc_u, enc_v_history, r2e).to(device)
+    graphrec = GraphRec(enc_u, enc_v_history, r2e, uf2e, vf2e).to(device)
     optimizer = torch.optim.RMSprop(graphrec.parameters(), lr=args.lr, alpha=0.9)
 
     best_rmse = 9999.0
     best_mae = 9999.0
     endure_count = 0
 
+    print('start training')
     for epoch in range(1, args.epochs + 1):
 
         train(graphrec, device, train_loader, optimizer, epoch, best_rmse, best_mae)
-        expected_rmse, mae = test(graphrec, device, test_loader)
+        expected_rmse, mae = model_test(graphrec, device, test_loader)
         # please add the validation set to tune the hyper-parameters based on your datasets.
 
         # early stopping (no validation set in toy dataset)

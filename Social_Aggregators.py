@@ -25,6 +25,9 @@ class Social_Aggregator(nn.Module):
         for i in range(len(nodes)):
             tmp_adj = to_neighs[i]
             num_neighs = len(tmp_adj)
+            if num_neighs == 0:
+                embed_matrix[i] = nodes[i]
+                continue
             # 
             e_u = self.u2e.weight[list(tmp_adj)] # fast: user embedding 
             #slow: item-space user latent factor (item aggregation)
