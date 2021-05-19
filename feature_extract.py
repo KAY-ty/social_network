@@ -27,7 +27,6 @@ def filter(df,user=True):
 def user_feature_extract(file):
     df = pd.read_csv(prefix + file + ".csv")
     df = filter(df,True)
-
     float_features = ["average_stars", "useful", "compliment_photos", "compliment_list", 'compliment_funny',
                     'compliment_plain', 'review_count', 'fans', 'compliment_note', 'funny', 'compliment_writer',
                     'compliment_cute', 'average_stars', 'compliment_more', 'compliment_hot', 'cool',
@@ -136,7 +135,6 @@ def item_feat_tensor(file):
     feats=torch.stack(feats)
     feats[torch.isnan(feats)] = 0
     return feats
-
 
 # step1: use these two function call to generate feature dict, key is user_id and value is feature vector
 # user_feature_extract("yelp_academic_dataset_user")
