@@ -97,8 +97,10 @@ def feature_to_tensor(file):
     return features
 
 
-
+# step1: use these two function call to generate feature dict, key is user_id and value is feature vector
 # user_feature_extract("yelp_academic_dataset_user")
 # item_feature_extract("yelp_academic_dataset_business")
+
+# step2 use these two function call to get feature tensor dict, key is user_id and value is feature vector (torch tensor)
 # feature_to_tensor("yelp_academic_dataset_user")
-feature_to_tensor("yelp_academic_dataset_business")
+# feature_to_tensor("yelp_academic_dataset_business")
