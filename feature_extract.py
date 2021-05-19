@@ -2,11 +2,31 @@ import pandas as pd
 import json
 import math
 import torch
+import pickle
 
-prefix = "D:\data\yelp_dataset\csv\\"
+prefix = "data/"
+
+def filter(df,user=True):
+    s=None
+    with open('data/uv2i.pickle','rb') as f:
+        if user:
+            s,_=pickle.load(f)
+        else:
+            _,s=pickle.load(f)
+    print('original len:',len(df))
+
+    if user:
+        df=df[df.user_id.isin(s)]
+    else:
+        df=df[df.business_id.isin(s)]
+    print('sample len:',len(df))
+    return df
+
+
 
 def user_feature_extract(file):
     df = pd.read_csv(prefix + file + ".csv")
+    df = filter(df,True)
     float_features = ["average_stars", "useful", "compliment_photos", "compliment_list", 'compliment_funny',
                     'compliment_plain', 'review_count', 'fans', 'compliment_note', 'funny', 'compliment_writer',
                     'compliment_cute', 'average_stars', 'compliment_more', 'compliment_hot', 'cool',
@@ -22,13 +42,14 @@ def user_feature_extract(file):
             else:
                 feature.append(float(len(profile[key].split(","))))
         features[profile["user_id"]] = feature
-    with open(prefix + file + ".json", "w") as outfile:
+    with open(prefix + file + "_feat.json", "w") as outfile:
         json.dump(features, outfile)
         outfile.close()
 
 
 def item_feature_extract(file):
     df = pd.read_csv(prefix + file + ".csv")
+    df = filter(df, False)
     float_features = ["stars", "review_count", "is_open", "attributes.RestaurantsPriceRange2"]
     bool_features = ["RestaurantsDelivery", "Open24Hours", "DogsAllowed", "CoatCheck", "RestaurantsGoodForGroups",
                      "BYOB", "RestaurantsTableService", "RestaurantsCounterService", "Corkage", "GoodForKids",
@@ -85,17 +106,35 @@ def item_feature_extract(file):
     # for key in enumerate_features:
     #     dic[key] = {v: idx for idx, v in enumerate(dic[key], 1)}
     # print(dic)
-    with open(prefix + file + ".json", "w") as outfile:
+    with open(prefix + file + "_feat.json", "w") as outfile:
         json.dump(features, outfile)
         outfile.close()
 
 def feature_to_tensor(file):
-    with open(prefix + file + ".json", "r") as file:
+    with open(prefix + file + "_feat.json", "r") as file:
         features_list = json.load(file)
         file.close()
         features = {user: torch.tensor(f, dtype=torch.float64, device=torch.device("cpu")) for user, f in features_list.items()}
     return features
 
+def user_feat_tensor(file):
+    features=feature_to_tensor(file)
+    with open('data/uv2i.pickle','rb') as f:
+            u2i,_=pickle.load(f)
+    features={u2i[user]:feat for user,feat in features.iteritems()}
+    feats=[features[i] for i in range(len(features))]
+    feats=torch.stack(feats)
+    return feats
+
+def item_feat_tensor(file):
+    features=feature_to_tensor(file)
+    with open('data/uv2i.pickle','rb') as f:
+            _,b2i=pickle.load(f)
+    features={b2i[item]:feat for item,feat in features.iteritems()}
+    feats=[features[i] for i in range(len(features))]
+    feats=torch.stack(feats)
+    feats[torch.isnan(feats)] = 0
+    return feats
 
 # step1: use these two function call to generate feature dict, key is user_id and value is feature vector
 # user_feature_extract("yelp_academic_dataset_user")
@@ -104,3 +143,11 @@ def feature_to_tensor(file):
 # step2 use these two function call to get feature tensor dict, key is user_id and value is feature vector (torch tensor)
 # feature_to_tensor("yelp_academic_dataset_user")
 # feature_to_tensor("yelp_academic_dataset_business")
+if __name__=='__main__':
+    item_feature_extract("yelp_academic_dataset_business")
+    user_feature_extract('yelp_academic_dataset_user')
+
+    feats=user_feat_tensor('yelp_academic_dataset_user')
+    torch.save(feats,'data/user.pt')
+    feats = item_feat_tensor('yelp_academic_dataset_business')
+    torch.save(feats, 'data/business.pt')
